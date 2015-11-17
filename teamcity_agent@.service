@@ -1,0 +1,22 @@
+[Unit]
+Description=Teamcity Build Agent
+After=docker.service
+Requires=docker.service
+
+[Service]
+Environment=TEAMCITY_SERVER=http://ci.gohan.wannabemutants.com
+EnvironmentFile=-/etc/environment
+ExecStartPre=-/usr/bin/docker kill %p-%i
+ExecStartPre=-/usr/bin/docker rm %p-%i
+ExecStartPre=/usr/bin/docker pull sjoerdmulder/teamcity-aget:latest
+ExecStartPre=/usr/bin/bash -c "echo $${COREOS_PUBLIC_IPV4:-$$(hostname -i)} | /usr/bin/etcdctl set /teamcity_agent_%i"
+
+ExecStart=/usr/bin/bash -c " \
+    exec /usr/bin/docker run --rm --name %p-%i -e TEAMCITY_SERVER=${TEAMCITY_SERVER} \
+    -p 9090:9090 sjoerdmulder/teamcity-agent:latest"
+ExecStop=/usr/bin/docker stop %p-%i
+ExecStopPost=/usr/bin/etcdctl rm /teamcity_agent_%i
+TimeoutStartSec=900s
+
+[X-Fleet]
+Conflicts=%p@*.service
